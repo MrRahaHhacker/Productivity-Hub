@@ -59,10 +59,13 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import com.example.ui.common.InteractiveDatePickerCard
+import com.example.ui.common.InteractiveTimePickerCard
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
@@ -830,75 +833,164 @@ private fun ManualAttendanceDialog(
     onDismiss: () -> Unit,
     onConfirm: (String, Long, Long?, String) -> Unit
 ) {
-    val today = LocalDate.now()
-    var dateIso by remember { mutableStateOf(today.format(DateTimeFormatter.ISO_LOCAL_DATE)) }
-    var hoursWorked by remember { mutableStateOf("8.0") }
+    var selectedDate by remember { mutableStateOf(LocalDate.now()) }
+    var inHour by remember { mutableIntStateOf(9) }
+    var inMinute by remember { mutableIntStateOf(0) }
+    var outHour by remember { mutableIntStateOf(17) }
+    var outMinute by remember { mutableIntStateOf(0) }
     var note by remember { mutableStateOf("") }
+
+    val durationText = remember(inHour, inMinute, outHour, outMinute) {
+        val diffMin = ((outHour * 60 + outMinute) - (inHour * 60 + inMinute)).coerceAtLeast(0)
+        val h = diffMin / 60
+        val m = diffMin % 60
+        "${h}h ${m}m"
+    }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
-            shape = RoundedCornerShape(20.dp),
+            shape = RoundedCornerShape(22.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Column(
-                modifier = Modifier.padding(20.dp),
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                Text(
-                    text = "Add Past Attendance",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
+                item {
+                    Text(
+                        text = "Add Past Attendance",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
 
-                OutlinedTextField(
-                    value = dateIso,
-                    onValueChange = { dateIso = it },
-                    label = { Text("Date (YYYY-MM-DD)") },
-                    modifier = Modifier.fillMaxWidth()
-                )
+                // Interactive Calendar Picker
+                item {
+                    Text(
+                        text = "Attendance Date (Tap Calendar)",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    InteractiveDatePickerCard(
+                        selectedDate = selectedDate,
+                        onDateSelected = { selectedDate = it },
+                        label = "Recorded Date",
+                        testTag = "manual_attendance_date_picker"
+                    )
+                }
 
-                OutlinedTextField(
-                    value = hoursWorked,
-                    onValueChange = { hoursWorked = it },
-                    label = { Text("Total Hours (e.g. 8.0)") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                OutlinedTextField(
-                    value = note,
-                    onValueChange = { note = it },
-                    label = { Text("Note (Optional)") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    TextButton(onClick = onDismiss) {
-                        Text("Cancel")
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Button(
-                        onClick = {
-                            val parsedHours = hoursWorked.toDoubleOrNull() ?: 8.0
-                            val parsedDate = try {
-                                LocalDate.parse(dateIso)
-                            } catch (e: Exception) {
-                                today
+                // Interactive Check-In Clock Picker
+                item {
+                    Text(
+                        text = "Check-In Time (Tap Clock)",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    InteractiveTimePickerCard(
+                        hour = inHour,
+                        minute = inMinute,
+                        onTimeSelected = { h, m ->
+                            inHour = h
+                            inMinute = m
+                            if (outHour < h || (outHour == h && outMinute <= m)) {
+                                outHour = (h + 8).coerceAtMost(23)
+                                outMinute = m
                             }
-                            val startMillis = parsedDate.atTime(9, 0)
-                                .atZone(java.time.ZoneId.systemDefault())
-                                .toInstant()
-                                .toEpochMilli()
-                            val endMillis = startMillis + (parsedHours * 3600 * 1000).toLong()
-
-                            onConfirm(dateIso, startMillis, endMillis, note)
                         },
-                        modifier = Modifier.testTag("confirm_manual_attendance_button")
+                        label = "Entry / Punch-In Time",
+                        testTag = "manual_attendance_in_time_picker"
+                    )
+                }
+
+                // Interactive Check-Out Clock Picker
+                item {
+                    Text(
+                        text = "Check-Out Time (Tap Clock)",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    InteractiveTimePickerCard(
+                        hour = outHour,
+                        minute = outMinute,
+                        onTimeSelected = { h, m ->
+                            outHour = h
+                            outMinute = m
+                        },
+                        label = "Exit / Punch-Out Time",
+                        testTag = "manual_attendance_out_time_picker"
+                    )
+                }
+
+                // Duration preview badge
+                item {
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Save Record")
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "Total Logged Duration:",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = durationText,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
+
+                item {
+                    OutlinedTextField(
+                        value = note,
+                        onValueChange = { note = it },
+                        label = { Text("Note (Optional, e.g. Lab work / Shift)") },
+                        placeholder = { Text("e.g. Regular workday or practical class") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(onClick = onDismiss) {
+                            Text("Cancel")
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Button(
+                            onClick = {
+                                val dateIso = selectedDate.format(DateTimeFormatter.ISO_LOCAL_DATE)
+                                val startMillis = selectedDate.atTime(inHour, inMinute)
+                                    .atZone(java.time.ZoneId.systemDefault())
+                                    .toInstant()
+                                    .toEpochMilli()
+                                val endMillis = selectedDate.atTime(outHour, outMinute)
+                                    .atZone(java.time.ZoneId.systemDefault())
+                                    .toInstant()
+                                    .toEpochMilli()
+
+                                onConfirm(dateIso, startMillis, endMillis, note)
+                            },
+                            modifier = Modifier.testTag("confirm_manual_attendance_button")
+                        ) {
+                            Text("Save Record")
+                        }
                     }
                 }
             }

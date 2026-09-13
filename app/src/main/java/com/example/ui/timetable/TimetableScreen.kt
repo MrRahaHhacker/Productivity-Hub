@@ -74,6 +74,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.local.TimetableSlot
+import com.example.ui.common.InteractiveTimePickerCard
 import com.example.ui.theme.AccentEmerald
 import com.example.ui.theme.AccentRose
 import com.example.ui.theme.AccentTeal
@@ -612,10 +613,10 @@ private fun SlotFormDialog(
 ) {
     var title by remember { mutableStateOf(slotToEdit?.title ?: "") }
     var selectedDay by remember { mutableIntStateOf(slotToEdit?.dayOfWeek ?: initialDayOfWeek) }
-    var startHourStr by remember { mutableStateOf(slotToEdit?.startHour?.toString() ?: "9") }
-    var startMinStr by remember { mutableStateOf(String.format("%02d", slotToEdit?.startMinute ?: 0)) }
-    var endHourStr by remember { mutableStateOf(slotToEdit?.endHour?.toString() ?: "10") }
-    var endMinStr by remember { mutableStateOf(String.format("%02d", slotToEdit?.endMinute ?: 30)) }
+    var startHour by remember { mutableIntStateOf(slotToEdit?.startHour ?: 9) }
+    var startMinute by remember { mutableIntStateOf(slotToEdit?.startMinute ?: 0) }
+    var endHour by remember { mutableIntStateOf(slotToEdit?.endHour ?: 10) }
+    var endMinute by remember { mutableIntStateOf(slotToEdit?.endMinute ?: 30) }
     var description by remember { mutableStateOf(slotToEdit?.description ?: "") }
     var selectedCategory by remember { mutableStateOf(slotToEdit?.category ?: "Work") }
 
@@ -679,45 +680,47 @@ private fun SlotFormDialog(
                     }
                 }
 
-                // Start & End Time Input Rows
+                // Start & End Interactive Time Pickers (Clock Face / Dial)
                 item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        OutlinedTextField(
-                            value = startHourStr,
-                            onValueChange = { startHourStr = it },
-                            label = { Text("Start Hr (0-23)") },
-                            modifier = Modifier.weight(1f)
-                        )
-                        OutlinedTextField(
-                            value = startMinStr,
-                            onValueChange = { startMinStr = it },
-                            label = { Text("Start Min") },
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
+                    Text(
+                        text = "Start Time (Tap Clock to Select)",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    InteractiveTimePickerCard(
+                        hour = startHour,
+                        minute = startMinute,
+                        onTimeSelected = { h, m ->
+                            startHour = h
+                            startMinute = m
+                            if (endHour < h || (endHour == h && endMinute <= m)) {
+                                endHour = (h + 1).coerceAtMost(23)
+                                endMinute = m
+                            }
+                        },
+                        label = "Class / Slot Begins",
+                        testTag = "timetable_start_time_picker"
+                    )
                 }
 
                 item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        OutlinedTextField(
-                            value = endHourStr,
-                            onValueChange = { endHourStr = it },
-                            label = { Text("End Hr (0-23)") },
-                            modifier = Modifier.weight(1f)
-                        )
-                        OutlinedTextField(
-                            value = endMinStr,
-                            onValueChange = { endMinStr = it },
-                            label = { Text("End Min") },
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
+                    Text(
+                        text = "End Time (Tap Clock to Select)",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    InteractiveTimePickerCard(
+                        hour = endHour,
+                        minute = endMinute,
+                        onTimeSelected = { h, m ->
+                            endHour = h
+                            endMinute = m
+                        },
+                        label = "Class / Slot Concludes",
+                        testTag = "timetable_end_time_picker"
+                    )
                 }
 
                 // Category selection chips
@@ -774,19 +777,15 @@ private fun SlotFormDialog(
                         Button(
                             onClick = {
                                 if (title.isNotBlank()) {
-                                    val sHour = (startHourStr.toIntOrNull() ?: 9).coerceIn(0, 23)
-                                    val sMin = (startMinStr.toIntOrNull() ?: 0).coerceIn(0, 59)
-                                    val eHour = (endHourStr.toIntOrNull() ?: (sHour + 1)).coerceIn(0, 23)
-                                    val eMin = (endMinStr.toIntOrNull() ?: sMin).coerceIn(0, 59)
                                     val chosenColor = CATEGORIES.find { it.first == selectedCategory }?.second ?: 0xFF4F46E5
 
                                     onSave(
                                         selectedDay,
                                         title.trim(),
-                                        sHour,
-                                        sMin,
-                                        eHour,
-                                        eMin,
+                                        startHour,
+                                        startMinute,
+                                        endHour,
+                                        endMinute,
                                         description.trim(),
                                         selectedCategory,
                                         chosenColor

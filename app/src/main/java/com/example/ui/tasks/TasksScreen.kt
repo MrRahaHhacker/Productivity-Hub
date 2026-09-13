@@ -53,11 +53,18 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import com.example.ui.common.InteractiveDatePickerCard
+import com.example.ui.common.InteractiveTimePickerCard
+import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.ZoneId
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -533,7 +540,10 @@ private fun TaskFormDialog(
     onDismiss: () -> Unit,
     onSave: (title: String, desc: String, priority: TaskPriority, dueMillis: Long) -> Unit
 ) {
-    val now = System.currentTimeMillis()
+    val initialDateTime = taskToEdit?.dueDateMillis?.let {
+        Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDateTime()
+    } ?: LocalDateTime.now().plusDays(1).withHour(18).withMinute(0)
+
     var title by remember { mutableStateOf(taskToEdit?.title ?: "") }
     var description by remember { mutableStateOf(taskToEdit?.description ?: "") }
     var selectedPriority by remember {
@@ -547,7 +557,9 @@ private fun TaskFormDialog(
             } ?: TaskPriority.MEDIUM
         )
     }
-    var dueDaysOffset by remember { mutableStateOf(1) } // 0 = Today, 1 = Tomorrow, 3 = In 3 Days, 7 = Next Week
+    var selectedDate by remember { mutableStateOf(initialDateTime.toLocalDate()) }
+    var selectedHour by remember { mutableIntStateOf(initialDateTime.hour) }
+    var selectedMinute by remember { mutableIntStateOf(initialDateTime.minute) }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -555,115 +567,174 @@ private fun TaskFormDialog(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Column(
+            LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                Text(
-                    text = if (taskToEdit != null) "Edit Task" else "Add New Task",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
+                item {
+                    Text(
+                        text = if (taskToEdit != null) "Edit Task" else "Add New Task",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
 
-                OutlinedTextField(
-                    value = title,
-                    onValueChange = { title = it },
-                    label = { Text("Task Title *") },
-                    placeholder = { Text("e.g. Complete quarterly report") },
-                    modifier = Modifier.fillMaxWidth()
-                )
+                item {
+                    OutlinedTextField(
+                        value = title,
+                        onValueChange = { title = it },
+                        label = { Text("Task Title *") },
+                        placeholder = { Text("e.g. Complete quarterly report") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
 
-                OutlinedTextField(
-                    value = description,
-                    onValueChange = { description = it },
-                    label = { Text("Optional Details / Notes") },
-                    modifier = Modifier.fillMaxWidth(),
-                    maxLines = 3
-                )
+                item {
+                    OutlinedTextField(
+                        value = description,
+                        onValueChange = { description = it },
+                        label = { Text("Optional Details / Notes") },
+                        modifier = Modifier.fillMaxWidth(),
+                        maxLines = 3
+                    )
+                }
 
                 // Priority Level Selector
-                Text(
-                    text = "Priority Level",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    TaskPriority.values().forEach { priority ->
-                        val isSel = selectedPriority == priority
-                        val pColor = Color(priority.colorValue)
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = if (isSel) pColor else pColor.copy(alpha = 0.15f),
-                            modifier = Modifier
-                                .weight(1f)
-                                .clickable { selectedPriority = priority }
-                        ) {
-                            Text(
-                                text = priority.label,
-                                color = if (isSel) Color.White else pColor,
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(vertical = 10.dp),
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                            )
-                        }
-                    }
-                }
-
-                // Due Date Presets
-                Text(
-                    text = "Due Date",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    listOf(0 to "Today", 1 to "Tomorrow", 3 to "3 Days", 7 to "1 Week").forEach { (offset, label) ->
-                        val isSel = dueDaysOffset == offset
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = if (isSel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                            modifier = Modifier
-                                .weight(1f)
-                                .clickable { dueDaysOffset = offset }
-                        ) {
-                            Text(
-                                text = label,
-                                color = if (isSel) Color.White else MaterialTheme.colorScheme.onSurface,
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Medium,
-                                modifier = Modifier.padding(vertical = 8.dp),
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                            )
-                        }
-                    }
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    TextButton(onClick = onDismiss) {
-                        Text("Cancel")
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Button(
-                        onClick = {
-                            if (title.isNotBlank()) {
-                                val dueMillis = taskToEdit?.dueDateMillis ?: (now + (dueDaysOffset * 24L * 60 * 60 * 1000))
-                                onSave(title.trim(), description.trim(), selectedPriority, dueMillis)
-                            }
-                        },
-                        modifier = Modifier.testTag("save_task_button")
+                item {
+                    Text(
+                        text = "Priority Level",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text("Save Task")
+                        TaskPriority.values().forEach { priority ->
+                            val isSel = selectedPriority == priority
+                            val pColor = Color(priority.colorValue)
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = if (isSel) pColor else pColor.copy(alpha = 0.15f),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable { selectedPriority = priority }
+                            ) {
+                                Text(
+                                    text = priority.label,
+                                    color = if (isSel) Color.White else pColor,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(vertical = 10.dp),
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Interactive Calendar Picker
+                item {
+                    Text(
+                        text = "Due Date (Tap Calendar to Pick Date)",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    InteractiveDatePickerCard(
+                        selectedDate = selectedDate,
+                        onDateSelected = { selectedDate = it },
+                        label = "Deadline Date",
+                        testTag = "task_due_date_picker"
+                    )
+                }
+
+                // Interactive Clock Picker
+                item {
+                    Text(
+                        text = "Due Time (Tap Clock to Pick Time)",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    InteractiveTimePickerCard(
+                        hour = selectedHour,
+                        minute = selectedMinute,
+                        onTimeSelected = { h, m ->
+                            selectedHour = h
+                            selectedMinute = m
+                        },
+                        label = "Target Completion Time",
+                        testTag = "task_due_time_picker"
+                    )
+                }
+
+                // Quick Date Presets
+                item {
+                    Text(
+                        text = "Quick Date Shortcuts",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        listOf(
+                            0 to "Today",
+                            1 to "Tomorrow",
+                            3 to "In 3 Days",
+                            7 to "In 1 Week"
+                        ).forEach { (offset, label) ->
+                            val targetDate = LocalDate.now().plusDays(offset.toLong())
+                            val isSel = selectedDate == targetDate
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (isSel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable { selectedDate = targetDate }
+                            ) {
+                                Text(
+                                    text = label,
+                                    color = if (isSel) Color.White else MaterialTheme.colorScheme.onSurface,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Medium,
+                                    modifier = Modifier.padding(vertical = 8.dp),
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                )
+                            }
+                        }
+                    }
+                }
+
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(onClick = onDismiss) {
+                            Text("Cancel")
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Button(
+                            onClick = {
+                                if (title.isNotBlank()) {
+                                    val dueMillis = selectedDate.atTime(selectedHour, selectedMinute)
+                                        .atZone(ZoneId.systemDefault())
+                                        .toInstant()
+                                        .toEpochMilli()
+                                    onSave(title.trim(), description.trim(), selectedPriority, dueMillis)
+                                }
+                            },
+                            modifier = Modifier.testTag("save_task_button")
+                        ) {
+                            Text("Save Task")
+                        }
                     }
                 }
             }
