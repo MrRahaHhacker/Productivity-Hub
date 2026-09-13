@@ -1,0 +1,7 @@
+{
+  "name": "Productivity Hub",
+  "description": "A comprehensive personal productivity application with self-attendance tracking, weekly timetable manager, task manager, and memo notes.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
